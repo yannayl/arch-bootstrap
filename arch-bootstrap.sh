@@ -61,7 +61,7 @@ get_default_repo() {
   if [[ x"$ARCH" != xarm ]]; then
     local DEFAULT_REPO="http://mirrors.kernel.org/archlinux"
   else
-      local DEFAULT_REPO="http://mirror.archlinuxarm.org"
+    local DEFAULT_REPO="http://mirror.archlinuxarm.org"
   fi
 
   echo "$DEFAULT_REPO"
@@ -72,7 +72,7 @@ get_core_repo_url() {
   if [[ x"$ARCH" != xarm ]]; then
     local REPO="${REPO_URL%/}/core/os/$ARCH"
   else
-      local REPO="${REPO_URL%/}/$ARCH/core"
+    local REPO="${REPO_URL%/}/$ARCH/core"
   fi
 
   echo "$REPO"
@@ -83,7 +83,7 @@ get_templare_repo_url() {
   if [[ x"$ARCH" != xarm ]]; then
     local REPO="${REPO_URL%/}/\$repo/os/$ARCH"
   else
-      local REPO="${REPO_URL%/}/$ARCH"
+    local REPO="${REPO_URL%/}/$ARCH"
   fi
 
   echo "$REPO"
@@ -143,7 +143,7 @@ configure_static_qemu() {
   local ARCH=$1 DEST=$2
   QEMU_STATIC_BIN=/usr/bin/qemu-$ARCH-static
   [[ -e "$QEMU_STATIC_BIN" ]] ||\
-		{ debug "no static qemu for $ARCH, ignoring"; return 0; }
+    { debug "no static qemu for $ARCH, ignoring"; return 0; }
   cp "$QEMU_STATIC_BIN" "$DEST/usr/bin"
 }
 
@@ -200,7 +200,7 @@ main() {
   configure_pacman "$DEST" "$ARCH"
   configure_minimal_system "$DEST"
   if [[ -n "$USE_QEMU" ]]; then
-	  configure_static_qemu "$ARCH" "$DEST"
+    configure_static_qemu "$ARCH" "$DEST"
   fi
   install_packages "$ARCH" "$DEST" "${BASIC_PACKAGES[*]} ${EXTRA_PACKAGES[*]}"
   configure_pacman "$DEST" "$ARCH" # Pacman must be re-configured
