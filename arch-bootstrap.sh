@@ -24,6 +24,7 @@ set -e -u -o pipefail
 PACMAN_PACKAGES=(
   acl archlinux-keyring attr bzip2 curl expat glibc gpgme libarchive
   libassuan libgpg-error libssh2 lzo2 openssl pacman pacman-mirrorlist xz zlib
+  krb5 e2fsprogs gcc-libs keyutils net-tools
 )
 BASIC_PACKAGES=(${PACMAN_PACKAGES[*]} filesystem)
 EXTRA_PACKAGES=(coreutils bash grep gawk file tar systemd)
@@ -55,12 +56,44 @@ uncompress() {
 }  
 
 ###
+get_default_repo() {
+  local ARCH=$1
+  if [[ x"$ARCH" != xarm ]]; then
+    local DEFAULT_REPO="http://mirrors.kernel.org/archlinux"
+  else
+      local DEFAULT_REPO="http://mirror.archlinuxarm.org"
+  fi
+
+  echo "$DEFAULT_REPO"
+}
+
+get_core_repo_url() {
+  local REPO_URL=$1 ARCH=$2
+  if [[ x"$ARCH" != xarm ]]; then
+    local REPO="${REPO_URL%/}/core/os/$ARCH"
+  else
+      local REPO="${REPO_URL%/}/$ARCH/core"
+  fi
+
+  echo "$REPO"
+}
+
+get_templare_repo_url() {
+  local REPO_URL=$1 ARCH=$2
+  if [[ x"$ARCH" != xarm ]]; then
+    local REPO="${REPO_URL%/}/\$repo/os/$ARCH"
+  else
+      local REPO="${REPO_URL%/}/$ARCH"
+  fi
+
+  echo "$REPO"
+}
 
 configure_pacman() {
   local DEST=$1 ARCH=$2
   debug "configure DNS and pacman"
   cp "/etc/resolv.conf" "$DEST/etc/resolv.conf"
-  echo "Server = $REPO_URL/\$repo/os/$ARCH" >> "$DEST/etc/pacman.d/mirrorlist"
+  echo "Server = `get_templare_repo_url "$REPO_URL" "$ARCH"`" >> "$DEST/etc/pacman.d/mirrorlist"
 }
 
 configure_minimal_system() {
@@ -106,37 +139,56 @@ install_pacman_packages() {
   done
 }
 
+configure_static_qemu() {
+  local ARCH=$1 DEST=$2
+  QEMU_STATIC_BIN=/usr/bin/qemu-$ARCH-static
+  [[ -e "$QEMU_STATIC_BIN" ]] ||\
+		{ debug "no static qemu for $ARCH, ignoring"; return 0; }
+  cp "$QEMU_STATIC_BIN" "$DEST/usr/bin"
+}
+
 install_packages() {
   local ARCH=$1 DEST=$2 PACKAGES=$3
   debug "install packages: $PACKAGES"
+  LC_ALL=C chroot "$DEST" /usr/bin/pacman \
+    --noconfirm --arch $ARCH -Syw  $PACKAGES || true
   LC_ALL=C chroot "$DEST" /usr/bin/pacman \
     --noconfirm --arch $ARCH -Sy --force $PACKAGES
 }
 
 show_usage() {
-  stderr "show_usage: $(basename "$0") [-a i686|x86_64] [-r REPO_URL] DIRECTORY"
+  stderr "show_usage: $(basename "$0") [-q] [-a i686|x86_64] [-r REPO_URL] [ -d DOWNLOAD_DIR] DIRECTORY"
 }
 
 main() {
   # Process arguments and options
   test $# -eq 0 && set -- "-h"
-  local ARCH=$DEFAULT_ARCH
-  local REPO_URL=$DEFAULT_REPO_URL
+  local ARCH=
+  local REPO_URL=
+  local PACKDIR=
+  local PRESERVE_DOWNLOAD_DIR=
+  local USE_QEMU=
   
-  while getopts "a:r:h" ARG; do
+  while getopts "qa:r:d:h" ARG; do
     case "$ARG" in
       a) ARCH=$OPTARG;;
       r) REPO_URL=$OPTARG;;
+      q) USE_QEMU=true;;
+      d) PACKDIR=$OPTARG; PRESERVE_DOWNLOAD_DIR=true;;
       *) show_usage; return 1;;
     esac
   done
   shift $(($OPTIND-1))
   test $# -eq 1 || { show_usage; return 1; }
   
+  [[ -z "$ARCH" ]] && ARCH=$DEFAULT_ARCH
+  [[ -z "$REPO_URL" ]] &&REPO_URL=`get_default_repo "$ARCH"`
+  
   local DEST=$1
-  local REPO="${REPO_URL%/}/core/os/$ARCH"
-  local PACKDIR=$(mktemp -d)
-  trap "rm -rf '$PACKDIR'" KILL TERM EXIT
+  local REPO=`get_core_repo_url "$REPO_URL" "$ARCH"`
+  [[ -z "$PACKDIR" ]] && PACKDIR=$(mktemp -d)
+  mkdir -p "$PACKDIR"
+  [[ -z "$PRESERVE_DOWNLOAD_DIR" ]] && trap "rm -rf '$PACKDIR'" KILL TERM EXIT
   debug "destination directory: $DEST"
   debug "core repository: $REPO"
   debug "temporary directory: $PACKDIR"
@@ -147,9 +199,12 @@ main() {
   install_pacman_packages "${BASIC_PACKAGES[*]}" "$DEST" "$LIST" "$PACKDIR"
   configure_pacman "$DEST" "$ARCH"
   configure_minimal_system "$DEST"
+  if [[ -n "$USE_QEMU" ]]; then
+	  configure_static_qemu "$ARCH" "$DEST"
+  fi
   install_packages "$ARCH" "$DEST" "${BASIC_PACKAGES[*]} ${EXTRA_PACKAGES[*]}"
   configure_pacman "$DEST" "$ARCH" # Pacman must be re-configured
-  rm -rf "$PACKDIR"
+  [[ -z "$PRESERVE_DOWNLOAD_DIR" ]] && rm -rf "$PACKDIR"
   
   debug "done"
 }
