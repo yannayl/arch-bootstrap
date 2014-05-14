@@ -151,13 +151,11 @@ install_packages() {
   local ARCH=$1 DEST=$2 PACKAGES=$3
   debug "install packages: $PACKAGES"
   LC_ALL=C chroot "$DEST" /usr/bin/pacman \
-    --noconfirm --arch $ARCH -Syw  $PACKAGES || true
-  LC_ALL=C chroot "$DEST" /usr/bin/pacman \
     --noconfirm --arch $ARCH -Sy --force $PACKAGES
 }
 
 show_usage() {
-  stderr "show_usage: $(basename "$0") [-q] [-a i686|x86_64] [-r REPO_URL] [ -d DOWNLOAD_DIR] DIRECTORY"
+  stderr "show_usage: $(basename "$0") [-q] [-a i686|x86_64|arm] [-r REPO_URL] [ -d DOWNLOAD_DIR] DIRECTORY"
 }
 
 main() {
