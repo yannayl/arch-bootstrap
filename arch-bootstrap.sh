@@ -61,10 +61,10 @@ uncompress() {
 ###
 get_default_repo() {
   local ARCH=$1
-  if [[ x"$ARCH" != xarm ]]; then
-    local DEFAULT_REPO="http://mirrors.kernel.org/archlinux"
-  else
+  if [[ "$ARCH" == arm* ]]; then
     local DEFAULT_REPO="http://mirror.archlinuxarm.org"
+  else
+    local DEFAULT_REPO="http://mirrors.kernel.org/archlinux"
   fi
 
   echo "$DEFAULT_REPO"
@@ -72,10 +72,10 @@ get_default_repo() {
 
 get_core_repo_url() {
   local REPO_URL=$1 ARCH=$2
-  if [[ x"$ARCH" != xarm ]]; then
-    local REPO="${REPO_URL%/}/core/os/$ARCH"
-  else
+  if [[ "$ARCH" == arm* ]]; then
     local REPO="${REPO_URL%/}/$ARCH/core"
+  else
+    local REPO="${REPO_URL%/}/core/os/$ARCH"
   fi
 
   echo "$REPO"
@@ -83,10 +83,10 @@ get_core_repo_url() {
 
 get_template_repo_url() {
   local REPO_URL=$1 ARCH=$2
-  if [[ x"$ARCH" != xarm ]]; then
-    local REPO="${REPO_URL%/}/\$repo/os/$ARCH"
-  else
+  if [[ "$ARCH" == arm* ]]; then
     local REPO="${REPO_URL%/}/$ARCH"
+  else
+    local REPO="${REPO_URL%/}/\$repo/os/$ARCH"
   fi
 
   echo "$REPO"
@@ -145,6 +145,7 @@ install_pacman_packages() {
 
 configure_static_qemu() {
   local ARCH=$1 DEST=$2
+  [[ "$ARCH" == arm* ]] && ARCH=arm
   QEMU_STATIC_BIN=$(which qemu-$ARCH-static || echo )
   [[ -e "$QEMU_STATIC_BIN" ]] ||\
     { debug "no static qemu for $ARCH, ignoring"; return 0; }
